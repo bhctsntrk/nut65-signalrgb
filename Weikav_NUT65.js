@@ -27,7 +27,8 @@ export function ControllableParameters() {
 const RS = 65;              // Report size: 1 report ID + 64 data
 const CMD_SET = 0x07;
 const MODE_DIRECT = 45;     // "Close All" = Direct Control mode
-const WRITES_PER_FRAME = 30; // Budget per frame for round-robin
+const WRITES_PER_FRAME = 10; // Budget per frame (lower = less input lag)
+const PAUSE_EVERY = 5;       // Micro-pause every N writes (firmware breathing room)
 
 // ── LED Mapping (82 LEDs) ───────────────────────────────────────────────────
 
@@ -132,6 +133,8 @@ export function Render() {
 		lastH[i] = h;
 		lastS[i] = s;
 		sendPerKeyColor(mat[0], mat[1], h, s);
+		// Micro-pause: let firmware process keyboard scans between bursts
+		if (writes % PAUSE_EVERY === 0) device.pause(1);
 		writes++;
 	}
 
