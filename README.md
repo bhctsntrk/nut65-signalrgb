@@ -1,6 +1,18 @@
+<p align="center">
+  <a href="https://github.com/bhctsntrk/nut65-pipboy">
+    <img src="demo.gif" alt="NUT-65 Pip-Boy — AI games on your keyboard LEDs" width="300">
+  </a>
+</p>
+
+<p align="center">
+  <b>Also check out <a href="https://github.com/bhctsntrk/nut65-pipboy">NUT-65 Pip-Boy</a></b> — Fallout-themed desktop app that runs AI-controlled Snake, Pong & Marquee directly on your keyboard's RGB LEDs. Works standalone, no SignalRGB needed.
+</p>
+
+---
+
 # Weikav NUT65 — SignalRGB Plugin
 
-Community-made [SignalRGB](https://signalrgb.com/) plugin for the **Weikav NUT65** mechanical keyboard. Enables per-key RGB control, screen capture ambient lighting, and all SignalRGB effects.
+Community-made [SignalRGB](https://signalrgb.com/) plugin for the **Weikav NUT65** mechanical keyboard. Enables per-key RGB control, screen capture ambient lighting, and all SignalRGB effects — sync your keyboard with your monitor, games, and music.
 
 The NUT65 is not officially supported by SignalRGB. This plugin was built by reverse-engineering the VIA HID protocol from Weikav's web-based configurator.
 
@@ -95,7 +107,9 @@ MIT
 
 # Weikav NUT65 — SignalRGB Eklentisi
 
-Weikav NUT65 mekanik klavye için topluluk tarafından yapılmış [SignalRGB](https://signalrgb.com/) eklentisi. Tuş başına RGB kontrolü, ekran yakalama ortam aydınlatması ve tüm SignalRGB efektlerini kullanmanızı sağlar.
+> **Diğer projemize de göz atın:** [NUT-65 Pip-Boy](https://github.com/bhctsntrk/nut65-pipboy) — Klavyenizin RGB LED'lerinde yapay zeka kontrollü Yılan, Pong ve Kayan Yazı oyunları çalıştıran Fallout temalı masaüstü uygulaması. SignalRGB gerektirmez.
+
+Weikav NUT65 mekanik klavye için topluluk tarafından yapılmış [SignalRGB](https://signalrgb.com/) eklentisi. Tuş başına RGB kontrolü, ekran yakalama ortam aydınlatması ve tüm SignalRGB efektlerini kullanmanızı sağlar — klavyenizi monitörünüz, oyunlarınız ve müziğinizle senkronize edin.
 
 NUT65 resmi olarak SignalRGB tarafından desteklenmemektedir. Bu eklenti, Weikav'ın web tabanlı yapılandırıcısından VIA HID protokolü tersine mühendislik yapılarak oluşturulmuştur.
 
