@@ -44,7 +44,17 @@ SignalRGB provides RGB colors → the plugin converts to HSV → sends per-key c
 
 ### Performance
 
-~12 fps with 82 LEDs (67 keys + 15 light bar segments). Delta optimization skips unchanged keys, improving effective frame rate for typical content.
+The plugin uses several optimizations to balance smooth RGB effects with minimal keyboard input lag:
+
+| Optimization | Description |
+|-------------|-------------|
+| **Write budget** | Max 10 HID writes per frame (prevents firmware CPU starvation during key scanning) |
+| **Micro-pause** | 1ms pause every 5 writes (gives firmware breathing room for key scans) |
+| **Priority updates** | All 82 LEDs scanned each frame, sorted by delta — biggest visual changes sent first |
+| **Delta + hysteresis** | Unchanged LEDs (hue/sat delta ≤3) skipped entirely |
+| **Zero-alloc packets** | Pre-allocated 65-byte buffer reused for all HID writes |
+
+Effective result: ~12 fps for smooth effects, with significantly reduced key press latency during busy animations.
 
 ### Limitations
 
@@ -123,7 +133,15 @@ SignalRGB RGB renkleri sağlar → eklenti HSV'ye dönüştürür → tuş baş�
 
 ### Performans
 
-82 LED ile (67 tuş + 15 ışık çubuğu segmenti) ~12 fps. Delta optimizasyonu değişmeyen tuşları atlar.
+Eklenti, pürüzsüz RGB efektleri ile minimum tuş algılama gecikmesi arasında denge kurmak için çeşitli optimizasyonlar kullanır:
+
+- **Yazma bütçesi** — Kare başına maks. 10 HID yazma, firmware'in tuş taraması için daha fazla CPU zamanı bırakır
+- **Mikro-duraklama** — Her 5 yazmada 1ms mola, firmware'e tuş taramalarını işlemesi için nefes alanı verir
+- **Öncelikli güncelleme** — 82 LED her karede taranır, delta büyüklüğüne göre sıralanır, en büyük görsel değişiklikler önce gönderilir
+- **Delta + histerezis** — Değişmeyen LED'ler (ton/doygunluk delta ≤3) atlanır
+- **Sıfır-tahsisli paketler** — Önceden ayrılmış 65 bayt arabellek tüm HID yazmaları için yeniden kullanılır
+
+Sonuç: Efektler için ~12 fps, yoğun animasyonlarda belirgin şekilde azaltılmış tuş basma gecikmesi.
 
 ### Sınırlamalar
 
