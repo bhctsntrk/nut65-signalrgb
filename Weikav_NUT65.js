@@ -29,6 +29,7 @@ const CMD_SET = 0x07;
 const MODE_DIRECT = 45;     // "Close All" = Direct Control mode
 const WRITES_PER_FRAME = 10; // Budget per frame (lower = less input lag)
 const PAUSE_EVERY = 5;       // Micro-pause every N writes (firmware breathing room)
+const HYSTERESIS = 3;        // Min H/S delta to trigger an update
 
 // ── LED Mapping (82 LEDs) ───────────────────────────────────────────────────
 
@@ -74,7 +75,18 @@ export function LedPositions() { return vKeyPositions; }
 const LED_COUNT = vKeyNames.length;
 let lastH = new Array(LED_COUNT).fill(-100);
 let lastS = new Array(LED_COUNT).fill(-100);
-let cursor = 0;
+
+// Pre-allocated reusable packet buffer (avoids 600+ array allocations/sec)
+const pkt = new Array(RS).fill(0);
+
+// Scratch arrays for priority-based scheduling (zero allocation per frame)
+const pendingIdx   = new Uint8Array(LED_COUNT);
+const pendingDelta = new Uint16Array(LED_COUNT);
+let pendingCount = 0;
+
+// Per-frame HSV cache (avoids re-reading device.color in the send pass)
+const frameH = new Uint8Array(LED_COUNT);
+const frameS = new Uint8Array(LED_COUNT);
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 
@@ -97,14 +109,11 @@ export function Initialize() {
 }
 
 export function Render() {
-	let writes = 0;
+	// ── Pass 1: scan ALL LEDs, collect changed ones with delta magnitude ──
+	pendingCount = 0;
 
-	for (let count = 0; count < LED_COUNT; count++) {
-		if (writes >= WRITES_PER_FRAME) break;
-
-		const i = (cursor + count) % LED_COUNT;
+	for (let i = 0; i < LED_COUNT; i++) {
 		const pos = vKeyPositions[i];
-		const mat = vKeyMatrix[i];
 
 		let color;
 		if (LightingMode === "Forced") {
@@ -113,12 +122,10 @@ export function Render() {
 			color = device.color(pos[0], pos[1]);
 		}
 
-		// Convert RGB to HSV
 		let h, s;
 		const brightness = Math.max(color[0], color[1], color[2]);
 
 		if (brightness < 15) {
-			// Very dark: send low saturation (appears dim/off in direct mode)
 			h = 0;
 			s = 0;
 		} else {
@@ -127,23 +134,52 @@ export function Render() {
 			s = hsv[1];
 		}
 
-		// Delta check with hysteresis
-		if (Math.abs(h - lastH[i]) <= 3 && Math.abs(s - lastS[i]) <= 3) continue;
+		const dh = Math.abs(h - lastH[i]);
+		const ds = Math.abs(s - lastS[i]);
 
-		lastH[i] = h;
-		lastS[i] = s;
-		sendPerKeyColor(mat[0], mat[1], h, s);
-		// Micro-pause: let firmware process keyboard scans between bursts
-		if (writes % PAUSE_EVERY === 0) device.pause(1);
-		writes++;
+		if (dh <= HYSTERESIS && ds <= HYSTERESIS) continue;
+
+		frameH[i] = h;
+		frameS[i] = s;
+		pendingIdx[pendingCount] = i;
+		pendingDelta[pendingCount] = dh + ds;
+		pendingCount++;
 	}
 
-	// Advance cursor
-	cursor = (cursor + Math.max(writes, 1)) % LED_COUNT;
+	// ── Pass 2: sort by delta descending (biggest visual change first) ──
+	// Insertion sort — at most 82 elements, usually <10
+	for (let a = 1; a < pendingCount; a++) {
+		const keyA = pendingDelta[a];
+		const valA = pendingIdx[a];
+		let b = a - 1;
+		while (b >= 0 && pendingDelta[b] < keyA) {
+			pendingDelta[b + 1] = pendingDelta[b];
+			pendingIdx[b + 1] = pendingIdx[b];
+			b--;
+		}
+		pendingDelta[b + 1] = keyA;
+		pendingIdx[b + 1] = valA;
+	}
 
-	// Apply once per frame (flush all per-key colors to display)
+	// ── Pass 3: send top WRITES_PER_FRAME with micro-pauses ──
+	let writes = 0;
+
+	for (let p = 0; p < pendingCount; p++) {
+		if (writes >= WRITES_PER_FRAME) break;
+
+		const i = pendingIdx[p];
+		const mat = vKeyMatrix[i];
+
+		sendPerKeyColorFast(mat[0], mat[1], frameH[i], frameS[i]);
+		lastH[i] = frameH[i];
+		lastS[i] = frameS[i];
+		writes++;
+
+		if (writes % PAUSE_EVERY === 0) device.pause(1);
+	}
+
 	if (writes > 0) {
-		applyColors();
+		applyColorsFast();
 	}
 }
 
@@ -162,29 +198,31 @@ function sendCmd(args) {
 	device.write(packet, RS);
 }
 
-function sendPerKeyColor(row, col, hue, sat) {
-	if (row < 0 || row > 5 || col < 0 || col > 14) return;
-	const packet = new Array(RS).fill(0);
-	packet[0] = 0x00;
-	packet[1] = CMD_SET;
-	packet[2] = 0x00; // Channel 0 (per-key)
-	packet[3] = 0x03; // Per-key color command
-	packet[4] = 0x00; // Sub-channel
-	packet[5] = row;
-	packet[6] = col;
-	packet[7] = sat;  // Saturation first
-	packet[8] = hue;  // Hue second
-	device.write(packet, RS);
+// Reuses pre-allocated buffer — zero allocation per call
+function sendPerKeyColorFast(row, col, hue, sat) {
+	pkt[0] = 0x00;
+	pkt[1] = CMD_SET;
+	pkt[2] = 0x00;
+	pkt[3] = 0x03;
+	pkt[4] = 0x00;
+	pkt[5] = row;
+	pkt[6] = col;
+	pkt[7] = sat;
+	pkt[8] = hue;
+	device.write(pkt, RS);
 }
 
-function applyColors() {
-	const packet = new Array(RS).fill(0);
-	packet[0] = 0x00;
-	packet[1] = CMD_SET;
-	packet[2] = 0x00; // Channel 0
-	packet[3] = 0x02; // Apply/flush per-key colors
-	packet[4] = 0x00;
-	device.write(packet, RS);
+function applyColorsFast() {
+	pkt[0] = 0x00;
+	pkt[1] = CMD_SET;
+	pkt[2] = 0x00;
+	pkt[3] = 0x02;
+	pkt[4] = 0x00;
+	pkt[5] = 0x00;
+	pkt[6] = 0x00;
+	pkt[7] = 0x00;
+	pkt[8] = 0x00;
+	device.write(pkt, RS);
 }
 
 // ── Utilities ───────────────────────────────────────────────────────────────
