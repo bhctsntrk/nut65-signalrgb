@@ -27,9 +27,13 @@ export function ControllableParameters() {
 const RS = 65;              // Report size: 1 report ID + 64 data
 const CMD_SET = 0x07;
 const MODE_DIRECT = 45;     // "Close All" = Direct Control mode
-const WRITES_PER_FRAME = 10; // Budget per frame (lower = less input lag)
-const PAUSE_EVERY = 5;       // Micro-pause every N writes (firmware breathing room)
-const HYSTERESIS = 3;        // Min H/S delta to trigger an update
+const MIN_INTERVAL_MS = 100; // Throttle: process at most 1 frame per 100ms (10 FPS)
+const WRITES_PER_FRAME = 6;  // Budget per frame (lower = less input lag)
+const PAUSE_EVERY = 2;       // Micro-pause every N writes (firmware breathing room)
+const HYSTERESIS = 8;        // Min H/S delta to trigger an update
+
+// Throttle state — last processed frame timestamp
+let lastRenderMs = 0;
 
 // ── LED Mapping (82 LEDs) ───────────────────────────────────────────────────
 
@@ -109,6 +113,14 @@ export function Initialize() {
 }
 
 export function Render() {
+	// ── Pass 0: temporal throttle — skip frames to give MCU matrix-scan headroom ──
+	// SignalRGB calls Render() ~60x/sec; at 100ms interval we process ~10x/sec.
+	// Skipped frames are "free" — delta grows between processed frames so the
+	// delta-sorted writes still prioritize the most visually important changes.
+	const nowMs = Date.now();
+	if (nowMs - lastRenderMs < MIN_INTERVAL_MS) return;
+	lastRenderMs = nowMs;
+
 	// ── Pass 1: scan ALL LEDs, collect changed ones with delta magnitude ──
 	pendingCount = 0;
 
