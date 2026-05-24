@@ -80,7 +80,8 @@ What this adds:
   - 67 key/control LEDs.
   - 15 front lightbar segments.
 - RGB packets of up to 9 LEDs per HID report.
-- Chunk caching and a 33 ms render interval in the SignalRGB plugin.
+- Chunk caching, noise filtering, and a stable 10 FPS default profile in the SignalRGB plugin.
+- Per-frame write limiting to reduce USB traffic during video and screen-capture effects.
 - Better brightness behavior because SignalRGB sends adjusted RGB values directly.
 
 Full flashing guide: [docs/flashing.md](docs/flashing.md)
@@ -120,14 +121,14 @@ The included QMK firmware was tested on a real NUT65:
   - SignalRGB protocol: `1.0.6`
   - LED count: `82`
   - Firmware type: `2` / VIA
-  - Enable and disable commands responded correctly.
+  - Enable command responded correctly.
 
 SHA256:
 
 ```text
 DBED9118ABE7D2C902E014AD28D04D79A103717905C3BAD092196F33F9280725  leku_nut65_signalrgb_default.bin
 0C2E81A5394D1666AAEBED9A9D39B043B17B2405ABF94FB11F04D3D865548A9B  leku_nut65_signalrgb_default.hex
-50125C674BB9C7E2E1E1DEF5D590761A47C73BB35E8B09BEE22F84C1DE2EEB20  Weikav_NUT65_QMK_SignalRGB.js
+47C3A4D5B90B01956D63ADE643194C55A8F6FC71BF6EADD5934B803794D11338  Weikav_NUT65_QMK_SignalRGB.js
 EC79FDD73546321D735D782B1C727269127112E94DA16C269142053492A7B543  nut65-signalrgb-qmk.patch
 ```
 

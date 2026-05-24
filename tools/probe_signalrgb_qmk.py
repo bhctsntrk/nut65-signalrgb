@@ -14,7 +14,6 @@ COMMANDS = {
     "total_leds": 0x27,
     "firmware_type": 0x28,
     "enable": 0x25,
-    "disable": 0x26,
 }
 
 

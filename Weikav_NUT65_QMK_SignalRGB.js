@@ -14,6 +14,8 @@ shutdownMode:readonly
 shutdownColor:readonly
 LightingMode:readonly
 forcedColor:readonly
+RenderRate:readonly
+NoiseFilter:readonly
 */
 
 export function ControllableParameters() {
@@ -22,13 +24,14 @@ export function ControllableParameters() {
 		{"property":"shutdownColor", "group":"lighting", "label":"Shutdown Color", "description":"Color used when Shutdown Color is selected", "min":"0", "max":"360", "type":"color", "default":"#000000"},
 		{"property":"LightingMode", "group":"lighting", "label":"Lighting Mode", "description":"Canvas uses the active effect, Forced uses one color", "type":"combobox", "values":["Canvas", "Forced"], "default":"Canvas"},
 		{"property":"forcedColor", "group":"lighting", "label":"Forced Color", "description":"Color used when Forced mode is enabled", "min":"0", "max":"360", "type":"color", "default":"#009bde"},
+		{"property":"RenderRate", "group":"performance", "label":"Render Rate", "description":"Lower rates reduce screen-capture flicker and USB traffic", "type":"combobox", "values":["Safe 10 FPS", "Balanced 20 FPS", "Smooth 30 FPS"], "default":"Safe 10 FPS"},
+		{"property":"NoiseFilter", "group":"performance", "label":"Noise Filter", "description":"Ignores tiny RGB changes from video and overlay capture noise", "type":"combobox", "values":["High", "Medium", "Low", "Off"], "default":"High"},
 	];
 }
 
 const RAW_SIZE = 32;
 const REPORT_SIZE = RAW_SIZE + 1;
 const LEDS_PER_PACKET = 9;
-const MIN_RENDER_INTERVAL_MS = 33;
 
 const GET_QMK_VERSION = 0x21;
 const GET_PROTOCOL_VERSION = 0x22;
@@ -66,15 +69,21 @@ const LED_COUNT = vKeyNames.length;
 const CHUNK_COUNT = Math.ceil(LED_COUNT / LEDS_PER_PACKET);
 const packet = new Array(REPORT_SIZE).fill(0);
 const frameRgb = new Uint8Array(LED_COUNT * 3);
+const sentRgb = new Uint8Array(LED_COUNT * 3);
+const changedChunkStarts = new Uint8Array(CHUNK_COUNT);
+const changedChunkCounts = new Uint8Array(CHUNK_COUNT);
+const changedChunkDeltas = new Uint16Array(CHUNK_COUNT);
 let activeLedCount = LED_COUNT;
 let lastRenderMs = 0;
 let forceNextFrame = true;
+let sentRgbReady = false;
 let lastChunkKeys = new Array(CHUNK_COUNT).fill("");
 
 export function Initialize() {
 	activeLedCount = LED_COUNT;
 	lastRenderMs = 0;
 	forceNextFrame = true;
+	sentRgbReady = false;
 	lastChunkKeys.fill("");
 
 	requestCommand(GET_FIRMWARE_TYPE);
@@ -88,7 +97,7 @@ export function Initialize() {
 
 export function Render() {
 	const nowMs = Date.now();
-	if (!forceNextFrame && nowMs - lastRenderMs < MIN_RENDER_INTERVAL_MS) {
+	if (!forceNextFrame && nowMs - lastRenderMs < renderIntervalMs()) {
 		return;
 	}
 
@@ -116,14 +125,25 @@ export function Validate(endpoint) {
 
 function captureFrame() {
 	const forcedRgb = LightingMode === "Forced" ? hexToRgb(forcedColor) : null;
+	const threshold = noiseThreshold();
 
 	for (let i = 0; i < activeLedCount; i++) {
 		const pos = vKeyPositions[i];
 		const color = forcedRgb || device.color(pos[0], pos[1]);
 		const base = i * 3;
-		frameRgb[base] = byte(color[0]);
-		frameRgb[base + 1] = byte(color[1]);
-		frameRgb[base + 2] = byte(color[2]);
+		let red = filteredByte(color[0]);
+		let green = filteredByte(color[1]);
+		let blue = filteredByte(color[2]);
+
+		if (!forceNextFrame && sentRgbReady && threshold > 0 && isSmallRgbChange(base, red, green, blue, threshold)) {
+			red = sentRgb[base];
+			green = sentRgb[base + 1];
+			blue = sentRgb[base + 2];
+		}
+
+		frameRgb[base] = red;
+		frameRgb[base + 1] = green;
+		frameRgb[base + 2] = blue;
 	}
 }
 
@@ -138,18 +158,37 @@ function fillFrame(red, green, blue) {
 
 function sendFrame(force) {
 	let writes = 0;
+	let changedChunkCount = 0;
 
 	for (let start = 0; start < activeLedCount; start += LEDS_PER_PACKET) {
 		const count = Math.min(LEDS_PER_PACKET, activeLedCount - start);
 		const chunkIndex = start / LEDS_PER_PACKET;
 		const key = chunkKey(start, count);
+		const delta = chunkDelta(start, count);
 
 		if (!force && key === lastChunkKeys[chunkIndex]) {
 			continue;
 		}
 
+		changedChunkStarts[changedChunkCount] = start;
+		changedChunkCounts[changedChunkCount] = count;
+		changedChunkDeltas[changedChunkCount] = delta;
+		changedChunkCount++;
+	}
+
+	sortChangedChunks(changedChunkCount);
+
+	const writeLimit = force ? CHUNK_COUNT : maxWritesPerFrame();
+	for (let i = 0; i < changedChunkCount && writes < writeLimit; i++) {
+		const start = changedChunkStarts[i];
+		const count = changedChunkCounts[i];
+		const chunkIndex = start / LEDS_PER_PACKET;
+		const key = chunkKey(start, count);
+
 		sendColorChunk(start, count);
+		rememberSentChunk(start, count);
 		lastChunkKeys[chunkIndex] = key;
+		sentRgbReady = true;
 		writes++;
 
 		if (writes % 4 === 0) {
@@ -236,9 +275,134 @@ function chunkKey(start, count) {
 	return key;
 }
 
+function chunkDelta(start, count) {
+	if (!sentRgbReady) {
+		return 9999;
+	}
+
+	let delta = 0;
+	for (let i = 0; i < count; i++) {
+		const base = (start + i) * 3;
+		delta += Math.abs(frameRgb[base] - sentRgb[base]);
+		delta += Math.abs(frameRgb[base + 1] - sentRgb[base + 1]);
+		delta += Math.abs(frameRgb[base + 2] - sentRgb[base + 2]);
+	}
+
+	return delta;
+}
+
+function sortChangedChunks(changedChunkCount) {
+	for (let i = 1; i < changedChunkCount; i++) {
+		const start = changedChunkStarts[i];
+		const count = changedChunkCounts[i];
+		const delta = changedChunkDeltas[i];
+		let j = i - 1;
+
+		while (j >= 0 && changedChunkDeltas[j] < delta) {
+			changedChunkStarts[j + 1] = changedChunkStarts[j];
+			changedChunkCounts[j + 1] = changedChunkCounts[j];
+			changedChunkDeltas[j + 1] = changedChunkDeltas[j];
+			j--;
+		}
+
+		changedChunkStarts[j + 1] = start;
+		changedChunkCounts[j + 1] = count;
+		changedChunkDeltas[j + 1] = delta;
+	}
+}
+
 function byte(value) {
 	const numeric = Number(value) || 0;
 	return Math.max(0, Math.min(255, Math.round(numeric)));
+}
+
+function filteredByte(value) {
+	const valueByte = byte(value);
+	const step = noiseQuantizeStep();
+	if (step <= 1) {
+		return valueByte;
+	}
+
+	return byte(Math.round(valueByte / step) * step);
+}
+
+function renderIntervalMs() {
+	if (selectedRenderRate() === "Smooth 30 FPS") {
+		return 33;
+	}
+
+	if (selectedRenderRate() === "Safe 10 FPS") {
+		return 100;
+	}
+
+	return 50;
+}
+
+function noiseQuantizeStep() {
+	if (selectedNoiseFilter() === "Off") {
+		return 1;
+	}
+
+	if (selectedNoiseFilter() === "Low") {
+		return 4;
+	}
+
+	if (selectedNoiseFilter() === "High") {
+		return 16;
+	}
+
+	return 8;
+}
+
+function noiseThreshold() {
+	if (selectedNoiseFilter() === "Off") {
+		return 0;
+	}
+
+	if (selectedNoiseFilter() === "Low") {
+		return 3;
+	}
+
+	if (selectedNoiseFilter() === "High") {
+		return 10;
+	}
+
+	return 6;
+}
+
+function selectedRenderRate() {
+	return RenderRate || "Safe 10 FPS";
+}
+
+function selectedNoiseFilter() {
+	return NoiseFilter || "High";
+}
+
+function maxWritesPerFrame() {
+	if (selectedRenderRate() === "Smooth 30 FPS") {
+		return 4;
+	}
+
+	if (selectedRenderRate() === "Safe 10 FPS") {
+		return 3;
+	}
+
+	return 4;
+}
+
+function isSmallRgbChange(base, red, green, blue, threshold) {
+	return Math.abs(red - sentRgb[base]) <= threshold &&
+		Math.abs(green - sentRgb[base + 1]) <= threshold &&
+		Math.abs(blue - sentRgb[base + 2]) <= threshold;
+}
+
+function rememberSentChunk(start, count) {
+	for (let i = 0; i < count; i++) {
+		const base = (start + i) * 3;
+		sentRgb[base] = frameRgb[base];
+		sentRgb[base + 1] = frameRgb[base + 1];
+		sentRgb[base + 2] = frameRgb[base + 2];
+	}
 }
 
 function hexToRgb(hex) {

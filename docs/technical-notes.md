@@ -8,6 +8,8 @@ The downside is that it has to keep poking the firmware with per-key commands. U
 
 The QMK firmware path adds a small SignalRGB Raw HID command handler inside the keyboard firmware. SignalRGB can then send RGB packets directly.
 
+The QMK SignalRGB plugin defaults to a stable 10 FPS profile with high noise filtering and a small per-frame write limit. That trades a little animation smoothness for lower USB traffic during video and screen-capture effects, which is usually the better deal for an actual keyboard you type on.
+
 ## USB IDs
 
 | Mode | VID/PID |
