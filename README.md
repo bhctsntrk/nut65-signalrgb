@@ -1,181 +1,142 @@
+# Weikav NUT65 SignalRGB
+
+Community SignalRGB support for the Weikav NUT65 keyboard.
+
+This repo now has two paths:
+
+- **Legacy / no-flash plugin:** safest path, works on stock firmware, but uses the vendor VIA protocol.
+- **QMK SignalRGB firmware:** recommended path, requires flashing firmware, but gives cleaner RGB control, working front lightbar segments, and better brightness behavior.
+
+The short version: the legacy plugin talks to the stock firmware from the outside. The QMK firmware teaches the keyboard a proper SignalRGB Raw HID protocol. One is a polite workaround; the other is giving the keyboard the language book.
+
 <p align="center">
   <a href="https://github.com/bhctsntrk/nut65-pipboy">
-    <img src="demo.gif" alt="NUT-65 Pip-Boy — AI games on your keyboard LEDs" width="300">
+    <img src="demo.gif" alt="NUT65 Pip-Boy demo" width="300">
   </a>
 </p>
 
 <p align="center">
-  <b>Also check out <a href="https://github.com/bhctsntrk/nut65-pipboy">NUT-65 Pip-Boy</a></b> — Fallout-themed desktop app that runs AI-controlled Snake, Pong & Marquee directly on your keyboard's RGB LEDs. Works standalone, no SignalRGB needed.
+  <b>Also check out <a href="https://github.com/bhctsntrk/nut65-pipboy">NUT65 Pip-Boy</a></b>: a Fallout-themed desktop app that runs Snake, Pong, and marquee effects directly on the keyboard LEDs. It does not need SignalRGB.
 </p>
 
----
-
-# Weikav NUT65 — SignalRGB Plugin
-
-Community-made [SignalRGB](https://signalrgb.com/) plugin for the **Weikav NUT65** mechanical keyboard. Enables per-key RGB control, screen capture ambient lighting, and all SignalRGB effects — sync your keyboard with your monitor, games, and music.
-
-The NUT65 is not officially supported by SignalRGB. This plugin was built by reverse-engineering the VIA HID protocol from Weikav's web-based configurator.
-
-## Features
-
-- **Per-key RGB** — 67 keys individually controllable
-- **Light bar** — 15-segment front light bar support
-- **Screen capture** — Ambient lighting that reflects your screen
-- **All SignalRGB effects** — Gradients, reactive, audio-responsive, etc.
-- **No firmware modification** — Works with stock NUT65 firmware
-- **Safe** — Only writes to RAM, never touches EEPROM
-
-## Installation
-
-1. Download [`Weikav_NUT65.js`](Weikav_NUT65.js)
-2. Copy to `C:\Users\<YourName>\Documents\WhirlwindFX\Plugins\`
-3. Restart SignalRGB
-4. NUT65 should appear in the Devices list
-
-> **Important:** Close VIA or Vial before using SignalRGB — they share the same HID endpoint and cannot run simultaneously.
-
-## Requirements
-
-- Weikav NUT65 connected via **USB-C** (wired mode only)
-- [SignalRGB](https://signalrgb.com/) installed
-- Windows 10/11
-
-Bluetooth and 2.4G wireless modes are unaffected — the plugin only activates over USB.
-
-## How It Works
-
-The plugin communicates with the NUT65 over the VIA RAW HID endpoint (`usagePage: 0xFF60, usage: 0x61`).
-
-| Step | Command |
-|------|---------|
-| Set direct control mode | `[0x07, 0x03, 0x02, 45]` |
-| Set per-key color (HSV) | `[0x07, 0x00, 0x03, 0x00, row, col, sat, hue]` |
-| Flush colors to display | `[0x07, 0x00, 0x02, 0x00]` |
-
-SignalRGB provides RGB colors → the plugin converts to HSV → sends per-key commands → flushes once per frame.
-
-### Performance
-
-The plugin uses several optimizations to balance smooth RGB effects with minimal keyboard input lag:
-
-| Optimization | Description |
-|-------------|-------------|
-| **Write budget** | Max 10 HID writes per frame (prevents firmware CPU starvation during key scanning) |
-| **Micro-pause** | 1ms pause every 5 writes (gives firmware breathing room for key scans) |
-| **Priority updates** | All 82 LEDs scanned each frame, sorted by delta — biggest visual changes sent first |
-| **Delta + hysteresis** | Unchanged LEDs (hue/sat delta ≤3) skipped entirely |
-| **Zero-alloc packets** | Pre-allocated 65-byte buffer reused for all HID writes |
-
-Effective result: ~12 fps for smooth effects, with significantly reduced key press latency during busy animations.
-
-### Limitations
-
-- **No per-key brightness** — Only hue and saturation are controllable per key. Brightness is global.
-- **Light bar sync** — The front light bar has a separate firmware controller. It responds to per-key commands only in certain keyboard modes. You may need to manually cycle the light bar mode (Fn + light bar shortcut) to a static mode for full control.
-- **HSV only** — Dark screen areas may appear white since the keyboard cannot display low brightness per key.
-
-## Technical Details
+## Supported Device
 
 | Property | Value |
-|----------|-------|
-| Vendor ID | `0x342D` |
-| Product ID | `0xE51A` |
-| HID Interface | 1 |
-| Report Size | 65 bytes |
-| Matrix | 6 rows × 15 cols |
-| Color Format | HSV (hue 0-255, saturation 0-255) |
-| Direct Control Mode | 45 ("Close All") |
+| --- | --- |
+| Keyboard | Weikav NUT65 / LEKU NUT65 |
+| USB VID/PID | `342D:E51A` |
+| Bootloader VID/PID | `342D:DFA0` |
+| MCU | `WB32FQ95` |
+| Bootloader | `wb32-dfu` |
+| SignalRGB endpoint | Raw HID, usage page `0xFF60`, usage `0x61` |
 
-## Troubleshooting
+This is for the NUT65. Do not flash this firmware onto a different keyboard just because the case looks similar. That is how keyboards become expensive desk ornaments.
 
-**Keyboard not detected:**
-- Make sure it's connected via USB-C, not Bluetooth/2.4G
-- Close VIA and Vial completely
-- Restart SignalRGB
+## Which Method Should I Use?
 
-**Keys stay white:**
-- The plugin needs mode 45 to work. If mode was changed externally, restart SignalRGB.
+| Method | File | Firmware flash | Best for | Tradeoff |
+| --- | --- | --- | --- | --- |
+| Legacy no-flash | [`Weikav_NUT65.js`](Weikav_NUT65.js) | No | People who do not want flashing risk | More HID spam, partial brightness behavior, lightbar can be flaky |
+| QMK SignalRGB | [`Weikav_NUT65_QMK_SignalRGB.js`](Weikav_NUT65_QMK_SignalRGB.js) + [`firmware/leku_nut65_signalrgb_default.bin`](firmware/leku_nut65_signalrgb_default.bin) | Yes | Best SignalRGB support | Requires WB32 DFU driver and firmware flashing |
 
-**Light bar not responding:**
-- Cycle the light bar mode using Fn + shortcut until it syncs with the keys.
+## Method 1: Legacy No-Flash Plugin
+
+Use this if you are worried about flashing firmware.
+
+1. Download [`Weikav_NUT65.js`](Weikav_NUT65.js).
+2. Copy it to:
+
+   ```text
+   C:\Users\<YourName>\Documents\WhirlwindFX\Plugins\
+   ```
+
+3. Restart SignalRGB.
+4. Close VIA and Vial before using SignalRGB.
+
+### Legacy Limitations
+
+- Uses the stock vendor/VIA HID protocol.
+- Sends per-key HSV commands and flushes them to the keyboard.
+- Can reduce input responsiveness during heavy video effects.
+- Brightness behavior is limited because the stock protocol does not expose clean per-key RGB brightness.
+- The front lightbar may not fully sync depending on the keyboard's current lightbar mode.
+
+This method is the "no surgery" method. Safe, useful, but not perfect.
+
+## Method 2: QMK SignalRGB Firmware
+
+Use this for the best result.
+
+Files:
+
+- Firmware: [`firmware/leku_nut65_signalrgb_default.bin`](firmware/leku_nut65_signalrgb_default.bin)
+- SignalRGB plugin: [`Weikav_NUT65_QMK_SignalRGB.js`](Weikav_NUT65_QMK_SignalRGB.js)
+- Source patch: [`patches/nut65-signalrgb-qmk.patch`](patches/nut65-signalrgb-qmk.patch)
+
+What this adds:
+
+- QMK-style SignalRGB Raw HID commands.
+- 82 logical LEDs:
+  - 67 key/control LEDs.
+  - 15 front lightbar segments.
+- RGB packets of up to 9 LEDs per HID report.
+- Chunk caching and a 33 ms render interval in the SignalRGB plugin.
+- Better brightness behavior because SignalRGB sends adjusted RGB values directly.
+
+Full flashing guide: [docs/flashing.md](docs/flashing.md)
+
+Recovery notes: [docs/recovery.md](docs/recovery.md)
+
+Technical notes: [docs/technical-notes.md](docs/technical-notes.md)
+
+## QMK Method Installation Summary
+
+1. Make sure you have a second keyboard, or open Windows On-Screen Keyboard before entering DFU mode.
+2. Install the WB32 DFU driver if Windows shows `WB Device in DFU Mode` with an error.
+3. Put the NUT65 into bootloader mode.
+4. Flash:
+
+   ```powershell
+   wb32-dfu-updater_cli.exe -t -s 0x08000000 -D firmware\leku_nut65_signalrgb_default.bin
+   wb32-dfu-updater_cli.exe -R
+   ```
+
+5. Copy [`Weikav_NUT65_QMK_SignalRGB.js`](Weikav_NUT65_QMK_SignalRGB.js) to:
+
+   ```text
+   C:\Users\<YourName>\Documents\WhirlwindFX\Plugins\
+   ```
+
+6. Restart SignalRGB.
+
+## Build/Test Status
+
+The included QMK firmware was tested on a real NUT65:
+
+- Bootloader entered as `342D:DFA0`.
+- Firmware flashed with `wb32-dfu-updater_cli`.
+- Keyboard returned as `342D:E51A`.
+- Raw HID protocol probe passed:
+  - SignalRGB protocol: `1.0.6`
+  - LED count: `82`
+  - Firmware type: `2` / VIA
+  - Enable and disable commands responded correctly.
+
+SHA256:
+
+```text
+DBED9118ABE7D2C902E014AD28D04D79A103717905C3BAD092196F33F9280725  leku_nut65_signalrgb_default.bin
+0C2E81A5394D1666AAEBED9A9D39B043B17B2405ABF94FB11F04D3D865548A9B  leku_nut65_signalrgb_default.hex
+50125C674BB9C7E2E1E1DEF5D590761A47C73BB35E8B09BEE22F84C1DE2EEB20  Weikav_NUT65_QMK_SignalRGB.js
+EC79FDD73546321D735D782B1C727269127112E94DA16C269142053492A7B543  nut65-signalrgb-qmk.patch
+```
+
+## Sources
+
+- OEM QMK fork: <https://github.com/hangshengkeji/qmk_firmware>
+- WB32 DFU updater and Windows driver: <https://github.com/WestberryTech/wb32-dfu-updater>
+- SignalRGB: <https://signalrgb.com/>
 
 ## License
-
-MIT
-
----
-
-# Weikav NUT65 — SignalRGB Eklentisi
-
-> **Diğer projemize de göz atın:** [NUT-65 Pip-Boy](https://github.com/bhctsntrk/nut65-pipboy) — Klavyenizin RGB LED'lerinde yapay zeka kontrollü Yılan, Pong ve Kayan Yazı oyunları çalıştıran Fallout temalı masaüstü uygulaması. SignalRGB gerektirmez.
-
-Weikav NUT65 mekanik klavye için topluluk tarafından yapılmış [SignalRGB](https://signalrgb.com/) eklentisi. Tuş başına RGB kontrolü, ekran yakalama ortam aydınlatması ve tüm SignalRGB efektlerini kullanmanızı sağlar — klavyenizi monitörünüz, oyunlarınız ve müziğinizle senkronize edin.
-
-NUT65 resmi olarak SignalRGB tarafından desteklenmemektedir. Bu eklenti, Weikav'ın web tabanlı yapılandırıcısından VIA HID protokolü tersine mühendislik yapılarak oluşturulmuştur.
-
-## Özellikler
-
-- **Tuş başına RGB** — 67 tuş ayrı ayrı kontrol edilebilir
-- **Işık çubuğu** — 15 segmentli ön ışık çubuğu desteği
-- **Ekran yakalama** — Ekranınızı yansıtan ortam aydınlatması
-- **Tüm SignalRGB efektleri** — Gradyanlar, reaktif, ses duyarlı vb.
-- **Firmware değişikliği yok** — Orijinal NUT65 firmware'i ile çalışır
-- **Güvenli** — Yalnızca RAM'e yazar, EEPROM'a dokunmaz
-
-## Kurulum
-
-1. [`Weikav_NUT65.js`](Weikav_NUT65.js) dosyasını indirin
-2. `C:\Users\<KullanıcıAdınız>\Documents\WhirlwindFX\Plugins\` klasörüne kopyalayın
-3. SignalRGB'yi yeniden başlatın
-4. NUT65 cihaz listesinde görünmelidir
-
-> **Önemli:** SignalRGB kullanırken VIA veya Vial'ı kapatın — aynı HID uç noktasını paylaşırlar.
-
-## Gereksinimler
-
-- Weikav NUT65 **USB-C** ile bağlı (sadece kablolu mod)
-- [SignalRGB](https://signalrgb.com/) yüklü
-- Windows 10/11
-
-Bluetooth ve 2.4G kablosuz modlar etkilenmez — eklenti yalnızca USB üzerinden çalışır.
-
-## Nasıl Çalışır
-
-Eklenti, NUT65 ile VIA RAW HID uç noktası üzerinden iletişim kurar (`usagePage: 0xFF60, usage: 0x61`).
-
-SignalRGB RGB renkleri sağlar → eklenti HSV'ye dönüştürür → tuş başına komut gönderir → çerçeve başına bir kez uygular.
-
-### Performans
-
-Eklenti, pürüzsüz RGB efektleri ile minimum tuş algılama gecikmesi arasında denge kurmak için çeşitli optimizasyonlar kullanır:
-
-- **Yazma bütçesi** — Kare başına maks. 10 HID yazma, firmware'in tuş taraması için daha fazla CPU zamanı bırakır
-- **Mikro-duraklama** — Her 5 yazmada 1ms mola, firmware'e tuş taramalarını işlemesi için nefes alanı verir
-- **Öncelikli güncelleme** — 82 LED her karede taranır, delta büyüklüğüne göre sıralanır, en büyük görsel değişiklikler önce gönderilir
-- **Delta + histerezis** — Değişmeyen LED'ler (ton/doygunluk delta ≤3) atlanır
-- **Sıfır-tahsisli paketler** — Önceden ayrılmış 65 bayt arabellek tüm HID yazmaları için yeniden kullanılır
-
-Sonuç: Efektler için ~12 fps, yoğun animasyonlarda belirgin şekilde azaltılmış tuş basma gecikmesi.
-
-### Sınırlamalar
-
-- **Tuş başına parlaklık yok** — Yalnızca ton ve doygunluk kontrol edilebilir. Parlaklık globaldir.
-- **Işık çubuğu senkronizasyonu** — Ön ışık çubuğunun ayrı bir firmware denetleyicisi vardır. Tam kontrol için ışık çubuğu modunu (Fn + kısayol) manuel olarak statik moda almanız gerekebilir.
-- **Yalnızca HSV** — Koyu ekran alanları, klavye tuş başına düşük parlaklık gösteremediği için beyaz görünebilir.
-
-## Sorun Giderme
-
-**Klavye algılanmıyor:**
-- USB-C ile bağlı olduğundan emin olun (Bluetooth/2.4G değil)
-- VIA ve Vial'ı tamamen kapatın
-- SignalRGB'yi yeniden başlatın
-
-**Tuşlar beyaz kalıyor:**
-- Eklenti çalışması için mod 45 gereklidir. Mod harici olarak değiştirildiyse SignalRGB'yi yeniden başlatın.
-
-**Işık çubuğu yanıt vermiyor:**
-- Fn + kısayol ile ışık çubuğu modunu tuşlarla senkronize olana kadar değiştirin.
-
-## Lisans
 
 MIT
