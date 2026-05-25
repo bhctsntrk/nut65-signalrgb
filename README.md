@@ -1,13 +1,15 @@
 # Weikav NUT65 SignalRGB
 
-Community SignalRGB support for the Weikav NUT65 keyboard.
+Community SignalRGB support for the Weikav/LEKU NUT65 keyboard.
 
-This repo now has two paths:
+This repo provides two ways to use the NUT65 with SignalRGB:
 
-- **Legacy / no-flash plugin:** safest path, works on stock firmware, but uses the vendor VIA protocol.
-- **QMK SignalRGB firmware:** recommended path, requires flashing firmware, but gives cleaner RGB control, working front lightbar segments, and better brightness behavior.
+| Method | Firmware flash | Best for |
+| --- | --- | --- |
+| Legacy no-flash plugin | No | Stock firmware users who want the safest path |
+| QMK SignalRGB firmware | Yes | Best RGB sync, lightbar support, and brightness behavior |
 
-The short version: the legacy plugin talks to the stock firmware from the outside. The QMK firmware teaches the keyboard a proper SignalRGB Raw HID protocol. One is a polite workaround; the other is giving the keyboard the language book.
+The legacy plugin talks to the stock firmware from the outside. The QMK firmware adds a small Raw HID protocol inside the keyboard, so SignalRGB can send RGB packets directly. One is a polite workaround; the other teaches the keyboard the language.
 
 <p align="center">
   <a href="https://github.com/bhctsntrk/nut65-pipboy">
@@ -24,19 +26,17 @@ The short version: the legacy plugin talks to the stock firmware from the outsid
 | Property | Value |
 | --- | --- |
 | Keyboard | Weikav NUT65 / LEKU NUT65 |
-| USB VID/PID | `342D:E51A` |
+| Normal USB VID/PID | `342D:E51A` |
 | Bootloader VID/PID | `342D:DFA0` |
 | MCU | `WB32FQ95` |
 | Bootloader | `wb32-dfu` |
 | SignalRGB endpoint | Raw HID, usage page `0xFF60`, usage `0x61` |
 
-This is for the NUT65. Do not flash this firmware onto a different keyboard just because the case looks similar. That is how keyboards become expensive desk ornaments.
+This firmware is for the NUT65 only. Do not flash it to another keyboard just because the case looks similar. That is how keyboards become expensive desk ornaments.
 
-## Keyboard Mode Shortcuts
+## Keyboard Shortcuts
 
 SignalRGB needs the keyboard in wired USB mode.
-
-Default QMK shortcuts:
 
 | Action | Shortcut |
 | --- | --- |
@@ -45,44 +45,13 @@ Default QMK shortcuts:
 | Bluetooth slot 2 | `Fn + W` |
 | Bluetooth slot 3 | `Fn + E` |
 | 2.4 GHz mode | `Fn + R` |
-| Enter WB32 DFU bootloader | `Fn + Right Shift + Esc` |
+| WB32 DFU bootloader | `Fn + Right Shift + Esc` |
 
-Use the right Shift key for the bootloader shortcut. `Fn + Esc` is not the same thing; on this keymap it can clear/reset settings, which is a very believable trap.
+Use the right Shift key for bootloader mode. `Fn + Esc` is not the same shortcut; on this keymap it can clear/reset settings instead of entering DFU. It looks dramatic, but it is the wrong drama.
 
-## Which Method Should I Use?
+## Recommended Setup
 
-| Method | File | Firmware flash | Best for | Tradeoff |
-| --- | --- | --- | --- | --- |
-| Legacy no-flash | [`Weikav_NUT65.js`](Weikav_NUT65.js) | No | People who do not want flashing risk | More HID spam, partial brightness behavior, lightbar can be flaky |
-| QMK SignalRGB | [`Weikav_NUT65_QMK_SignalRGB.js`](Weikav_NUT65_QMK_SignalRGB.js) + [`firmware/leku_nut65_signalrgb_default.bin`](firmware/leku_nut65_signalrgb_default.bin) | Yes | Best SignalRGB support | Requires WB32 DFU driver and firmware flashing |
-
-## Method 1: Legacy No-Flash Plugin
-
-Use this if you are worried about flashing firmware.
-
-1. Download [`Weikav_NUT65.js`](Weikav_NUT65.js).
-2. Copy it to:
-
-   ```text
-   C:\Users\<YourName>\Documents\WhirlwindFX\Plugins\
-   ```
-
-3. Restart SignalRGB.
-4. Close VIA and Vial before using SignalRGB.
-
-### Legacy Limitations
-
-- Uses the stock vendor/VIA HID protocol.
-- Sends per-key HSV commands and flushes them to the keyboard.
-- Can reduce input responsiveness during heavy video effects.
-- Brightness behavior is limited because the stock protocol does not expose clean per-key RGB brightness.
-- The front lightbar may not fully sync depending on the keyboard's current lightbar mode.
-
-This method is the "no surgery" method. Safe, useful, but not perfect.
-
-## Method 2: QMK SignalRGB Firmware
-
-Use this for the best result.
+Use the QMK SignalRGB firmware if you are comfortable flashing firmware.
 
 Files:
 
@@ -90,62 +59,143 @@ Files:
 - SignalRGB plugin: [`Weikav_NUT65_QMK_SignalRGB.js`](Weikav_NUT65_QMK_SignalRGB.js)
 - Source patch: [`patches/nut65-signalrgb-qmk.patch`](patches/nut65-signalrgb-qmk.patch)
 
-What this adds:
+What the QMK path adds:
 
-- QMK-style SignalRGB Raw HID commands.
+- Direct SignalRGB Raw HID RGB streaming.
 - 82 logical LEDs:
   - 67 key/control LEDs.
   - 15 front lightbar segments.
-- LED mapping aligned with the OEM QMK visual order, including the physical left Ctrl battery indicator LED.
-- Firmware battery/wireless/startup indicator writes are muted while SignalRGB mode is active, while the lower lightbar mirror LEDs are still refreshed.
-- The left Ctrl battery/charging red-green prompt is intentionally hidden while SignalRGB is controlling the keyboard.
-- RGB packets of up to 9 LEDs per HID report.
-- Chunk caching, noise filtering, and a stable 10 FPS default profile in the SignalRGB plugin.
-- Per-frame write limiting to reduce USB traffic during video and screen-capture effects.
-- Better brightness behavior because SignalRGB sends adjusted RGB values directly.
+- Correct OEM visual LED order, including the physical left Ctrl LED.
+- Lower lightbar mirror support.
+- Direct RGB brightness behavior from SignalRGB.
+- Conservative default performance profile:
+  - `Safe 10 FPS`
+  - high noise filtering
+  - per-frame write limiting
+- Firmware indicator guard so the keyboard's own battery/wireless/startup effects do not fight SignalRGB.
 
-Full flashing guide: [docs/flashing.md](docs/flashing.md)
+Important tradeoff: while SignalRGB is controlling the LEDs, the stock left Ctrl battery/charging prompt is hidden. The NUT65 normally uses left Ctrl for red/green battery status, but that overlay was the thing fighting dark screen-capture effects. SignalRGB gets priority while active.
 
-Recovery notes: [docs/recovery.md](docs/recovery.md)
+## Quick Install: QMK SignalRGB Firmware
 
-Technical notes: [docs/technical-notes.md](docs/technical-notes.md)
+1. Put the keyboard in wired USB mode:
 
-## QMK Method Installation Summary
+   ```text
+   Fn + T
+   ```
 
-1. Make sure you have a second keyboard, or open Windows On-Screen Keyboard before entering DFU mode.
-2. Install the WB32 DFU driver if Windows shows `WB Device in DFU Mode` with an error.
-3. Put the NUT65 into bootloader mode with `Fn + Right Shift + Esc`.
-4. Flash:
+2. Close SignalRGB, VIA, and Vial.
+
+3. Have a second keyboard available, or open Windows On-Screen Keyboard.
+
+4. Enter WB32 DFU bootloader:
+
+   ```text
+   Fn + Right Shift + Esc
+   ```
+
+   Windows should show:
+
+   ```text
+   WB Device in DFU Mode
+   USB\VID_342D&PID_DFA0
+   ```
+
+5. If the flasher cannot see the DFU device, install the WB32 WinUSB driver from:
+
+   <https://github.com/WestberryTech/wb32-dfu-updater>
+
+6. Flash the `.bin` firmware:
 
    ```powershell
    wb32-dfu-updater_cli.exe -t -s 0x08000000 -D firmware\leku_nut65_signalrgb_default.bin
    wb32-dfu-updater_cli.exe -R
    ```
 
-5. Copy [`Weikav_NUT65_QMK_SignalRGB.js`](Weikav_NUT65_QMK_SignalRGB.js) to:
+7. Copy the SignalRGB plugin:
+
+   ```text
+   Weikav_NUT65_QMK_SignalRGB.js
+   ```
+
+   to:
 
    ```text
    C:\Users\<YourName>\Documents\WhirlwindFX\Plugins\
    ```
 
-6. Restart SignalRGB.
+8. Restart SignalRGB and select the QMK SignalRGB plugin.
 
-## Build/Test Status
+Detailed guide: [docs/flashing.md](docs/flashing.md)
 
-The QMK SignalRGB path has been tested on a real NUT65:
+Recovery notes: [docs/recovery.md](docs/recovery.md)
 
-- Bootloader entered as `342D:DFA0`.
-- Firmware flashed with `wb32-dfu-updater_cli`.
-- Keyboard returned as `342D:E51A`.
-- Raw HID protocol probe passed:
-  - SignalRGB protocol: `1.0.6`
-  - LED count: `82`
-  - Firmware type: `2` / VIA
-  - Enable command responded correctly.
+Technical notes: [docs/technical-notes.md](docs/technical-notes.md)
 
-The current firmware binary was rebuilt on 2026-05-25 after the LED-map and firmware-indicator guard fixes. That build completed successfully with QMK MSYS and produced a 67,936-byte `.bin`.
+## Legacy No-Flash Plugin
 
-It was then flashed on a real NUT65 and verified in SignalRGB with dark/video content. The left Ctrl battery prompt no longer overrides SignalRGB during active control.
+Use this path if you do not want to flash firmware.
+
+File:
+
+- [`Weikav_NUT65.js`](Weikav_NUT65.js)
+
+Install:
+
+1. Copy `Weikav_NUT65.js` to:
+
+   ```text
+   C:\Users\<YourName>\Documents\WhirlwindFX\Plugins\
+   ```
+
+2. Restart SignalRGB.
+3. Close VIA and Vial while using SignalRGB.
+
+Limitations:
+
+- Uses the stock vendor/VIA HID protocol.
+- Sends per-key HSV commands and flushes them to the keyboard.
+- Can reduce input responsiveness during heavy video or screen-capture effects.
+- Brightness behavior is limited by the stock protocol.
+- The front lightbar may not fully sync.
+
+This is the no-surgery method. Safe, useful, and not magic.
+
+## Verify The QMK Firmware
+
+With SignalRGB closed:
+
+```powershell
+uv run --with hidapi python tools\probe_signalrgb_qmk.py
+```
+
+Expected values:
+
+```text
+protocol: [34, 1, 0, 6, ...]
+total_leds: [39, 82, ...]
+firmware_type: [40, 2, ...]
+```
+
+In plain English:
+
+- SignalRGB protocol: `1.0.6`
+- LED count: `82`
+- Firmware type: `2` / VIA-style
+
+## Build And Test Status
+
+The QMK firmware path was tested on a real NUT65:
+
+- Entered bootloader as `342D:DFA0`.
+- Flashed with `wb32-dfu-updater_cli`.
+- Returned to normal mode as `342D:E51A`.
+- Raw HID probe passed.
+- SignalRGB loaded the QMK plugin.
+- Dark/video content no longer made left Ctrl flash red/green.
+- Lower lightbar segments remained controllable.
+
+The current firmware binary was rebuilt on 2026-05-25 after the LED-map and firmware-indicator guard fixes. The build completed successfully with QMK MSYS and produced a 67,936-byte `.bin`.
 
 SHA256:
 
