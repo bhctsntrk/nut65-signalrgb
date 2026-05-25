@@ -32,6 +32,23 @@ The short version: the legacy plugin talks to the stock firmware from the outsid
 
 This is for the NUT65. Do not flash this firmware onto a different keyboard just because the case looks similar. That is how keyboards become expensive desk ornaments.
 
+## Keyboard Mode Shortcuts
+
+SignalRGB needs the keyboard in wired USB mode.
+
+Default QMK shortcuts:
+
+| Action | Shortcut |
+| --- | --- |
+| Wired USB mode | `Fn + T` |
+| Bluetooth slot 1 | `Fn + Q` |
+| Bluetooth slot 2 | `Fn + W` |
+| Bluetooth slot 3 | `Fn + E` |
+| 2.4 GHz mode | `Fn + R` |
+| Enter WB32 DFU bootloader | `Fn + Right Shift + Esc` |
+
+Use the right Shift key for the bootloader shortcut. `Fn + Esc` is not the same thing; on this keymap it can clear/reset settings, which is a very believable trap.
+
 ## Which Method Should I Use?
 
 | Method | File | Firmware flash | Best for | Tradeoff |
@@ -79,6 +96,9 @@ What this adds:
 - 82 logical LEDs:
   - 67 key/control LEDs.
   - 15 front lightbar segments.
+- LED mapping aligned with the OEM QMK visual order, including the physical left Ctrl battery indicator LED.
+- Firmware battery/wireless/startup indicator writes are muted while SignalRGB mode is active, while the lower lightbar mirror LEDs are still refreshed.
+- The left Ctrl battery/charging red-green prompt is intentionally hidden while SignalRGB is controlling the keyboard.
 - RGB packets of up to 9 LEDs per HID report.
 - Chunk caching, noise filtering, and a stable 10 FPS default profile in the SignalRGB plugin.
 - Per-frame write limiting to reduce USB traffic during video and screen-capture effects.
@@ -94,7 +114,7 @@ Technical notes: [docs/technical-notes.md](docs/technical-notes.md)
 
 1. Make sure you have a second keyboard, or open Windows On-Screen Keyboard before entering DFU mode.
 2. Install the WB32 DFU driver if Windows shows `WB Device in DFU Mode` with an error.
-3. Put the NUT65 into bootloader mode.
+3. Put the NUT65 into bootloader mode with `Fn + Right Shift + Esc`.
 4. Flash:
 
    ```powershell
@@ -112,7 +132,7 @@ Technical notes: [docs/technical-notes.md](docs/technical-notes.md)
 
 ## Build/Test Status
 
-The included QMK firmware was tested on a real NUT65:
+The QMK SignalRGB path has been tested on a real NUT65:
 
 - Bootloader entered as `342D:DFA0`.
 - Firmware flashed with `wb32-dfu-updater_cli`.
@@ -123,13 +143,17 @@ The included QMK firmware was tested on a real NUT65:
   - Firmware type: `2` / VIA
   - Enable command responded correctly.
 
+The current firmware binary was rebuilt on 2026-05-25 after the LED-map and firmware-indicator guard fixes. That build completed successfully with QMK MSYS and produced a 67,936-byte `.bin`.
+
+It was then flashed on a real NUT65 and verified in SignalRGB with dark/video content. The left Ctrl battery prompt no longer overrides SignalRGB during active control.
+
 SHA256:
 
 ```text
-DBED9118ABE7D2C902E014AD28D04D79A103717905C3BAD092196F33F9280725  leku_nut65_signalrgb_default.bin
-0C2E81A5394D1666AAEBED9A9D39B043B17B2405ABF94FB11F04D3D865548A9B  leku_nut65_signalrgb_default.hex
+455D974D31A7A0F247DECF32DE3F3B2F8D64E5955A83DDAAA91F5AC37820F027  leku_nut65_signalrgb_default.bin
+2BD599E8CEE3B8EBB527DE54F66212DD24414E23277A8200441530CE099BFEF5  leku_nut65_signalrgb_default.hex
 47C3A4D5B90B01956D63ADE643194C55A8F6FC71BF6EADD5934B803794D11338  Weikav_NUT65_QMK_SignalRGB.js
-EC79FDD73546321D735D782B1C727269127112E94DA16C269142053492A7B543  nut65-signalrgb-qmk.patch
+D47A08ADC4AC24827D89EC3BE2AA3E064B20636AF8A40D42F799A3939DD78787  nut65-signalrgb-qmk.patch
 ```
 
 ## Sources

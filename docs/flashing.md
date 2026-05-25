@@ -13,6 +13,22 @@ Flashing firmware always has some risk. The NUT65 uses a WB32 DFU bootloader, so
 
 The second keyboard warning matters because once the NUT65 enters DFU mode, it stops acting like a keyboard. Windows may still ask for an admin password while installing the driver. Great timing, Windows. Truly theatrical.
 
+## Switch To Wired USB Mode
+
+SignalRGB and flashing both expect the keyboard to be on USB, not Bluetooth or 2.4 GHz.
+
+Default mode shortcuts:
+
+| Action | Shortcut |
+| --- | --- |
+| Wired USB mode | `Fn + T` |
+| Bluetooth slot 1 | `Fn + Q` |
+| Bluetooth slot 2 | `Fn + W` |
+| Bluetooth slot 3 | `Fn + E` |
+| 2.4 GHz mode | `Fn + R` |
+
+Before flashing or testing SignalRGB, press `Fn + T` with the USB cable connected.
+
 ## Files
 
 - Firmware: `firmware/leku_nut65_signalrgb_default.bin`
@@ -38,13 +54,26 @@ After the driver is installed, the device should show as OK in Device Manager.
 
 ## Enter Bootloader Mode
 
-Option A: use VIA/Vial if you already have a bootloader/reset key available.
+Preferred method for the QMK SignalRGB firmware:
 
-Option B: use the helper script in this repo:
+1. Keep the keyboard plugged in.
+2. Hold `Fn`.
+3. Hold `Right Shift`.
+4. Tap `Esc`.
 
-```powershell
-uv run --with hidapi python tools\jump_to_bootloader.py
-```
+Use the right Shift key, not left Shift. The default keymap puts `QK_BOOT` behind that second layer, which is a very keyboard-firmware way of hiding the emergency exit behind a bookcase.
+
+Alternative methods:
+
+- Hold `Esc` while plugging the USB cable in. On some firmware builds this clears persistent settings instead of entering DFU.
+- Use VIA/Vial if your current keymap has a bootloader/reset key.
+- Try the helper script only as a best-effort path for stock/VIA firmware builds:
+
+  ```powershell
+  uv run --with hidapi python tools\jump_to_bootloader.py
+  ```
+
+  The helper sends VIA command `0x0B`. Some NUT65 firmware builds ignore that command, so the key combo above is more reliable.
 
 The keyboard should disappear as `342D:E51A` and reappear as:
 

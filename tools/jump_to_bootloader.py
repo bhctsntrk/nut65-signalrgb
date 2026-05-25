@@ -1,3 +1,5 @@
+import time
+
 import hid
 
 
@@ -23,6 +25,16 @@ def main():
     written = keyboard.write(packet)
     keyboard.close()
     print(f"bootloader jump command written: {written}")
+    time.sleep(2)
+
+    try:
+        find_raw_hid_path()
+    except RuntimeError:
+        print("normal Raw HID endpoint disappeared; check for WB Device in DFU Mode")
+        return
+
+    print("keyboard still appears to be in normal mode")
+    print("try the hardware shortcut instead: Fn + Right Shift + Esc")
 
 
 if __name__ == "__main__":

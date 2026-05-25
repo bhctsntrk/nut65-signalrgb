@@ -2,7 +2,31 @@
 
 If something goes wrong, do not panic first. Panic is a terrible debugging tool.
 
+## Mode Shortcuts
+
+If SignalRGB does not see the keyboard, first make sure it is in wired USB mode:
+
+```text
+Fn + T
+```
+
+Other default mode shortcuts:
+
+| Action | Shortcut |
+| --- | --- |
+| Bluetooth slot 1 | `Fn + Q` |
+| Bluetooth slot 2 | `Fn + W` |
+| Bluetooth slot 3 | `Fn + E` |
+| 2.4 GHz mode | `Fn + R` |
+| WB32 DFU bootloader | `Fn + Right Shift + Esc` |
+
 ## Keyboard Still Enters DFU
+
+From the QMK SignalRGB firmware, enter DFU with:
+
+```text
+Fn + Right Shift + Esc
+```
 
 If Windows can see:
 
@@ -49,6 +73,10 @@ Try:
 - Unplug and replug the keyboard.
 - Make sure the QMK plugin is active, not the legacy plugin.
 - Test with a simple solid-color effect before testing video/screen capture.
+
+## Left Ctrl No Longer Shows Battery Color In SignalRGB
+
+That is expected while SignalRGB is active. The stock firmware uses left Ctrl for low-battery, charging, and full-charge red/green prompts. The QMK SignalRGB firmware mutes those prompt overlays during SignalRGB control so they do not fight screen-capture effects.
 
 ## Need To Go Back To Stock
 
